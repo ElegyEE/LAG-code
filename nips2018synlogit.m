@@ -22,29 +22,29 @@ total_sample=size(Xdata_29(1:50,:),1);
 Xdata=randn(total_sample,num_feature);
 ydata=[ydata_29(1:50)];
 
-[Q R]=qr(Xdata);
-diagmatrix=diag(ones(total_sample,1));
-% [lambda]=eig(Xdata'*Xdata);
+[Q R]=qr(Xdata); % qr分解
+diagmatrix=diag(ones(total_sample,1)); % 创建对角矩阵
+% [lambda]=eig(Xdata'*Xdata); % 特征值
 Hmax=zeros(num_workers,1);
 for i=1:num_workers
-   X{i}=1^(i-1)*Q(:,i)*Q(:,i)'+diag(ones(total_sample,1));
-   Hmax(i)=max(eig(X{i}'*X{i})); 
+   X{i}=1^(i-1)*Q(:,i)*Q(:,i)'+diag(ones(total_sample,1)); % 数据预处理
+   Hmax(i)=max(eig(X{i}'*X{i})); % 如果 A 是向量，则 max(A) 返回 A 的最大值。如果 A 为矩阵，则 max(A) 是包含每一列的最大值的行向量。 eig返回特征值列向量
    y{i}=ydata;
 end
 
 num_feature=size(X{1},2);
 
-Hmax_sum=sum(Hmax);
+Hmax_sum=sum(Hmax); % 如果 A 是向量，则 sum(A) 返回元素之和。如果 A 是矩阵，则 sum(A) 将返回包含每列总和的行向量
 
-%% data pre-analysis
+%% data pre-analysis 数据预分析
 lambda=0.001;
 Hmax=zeros(num_workers,1);
 for i=1:num_workers
    Hmax(i)=0.25*max(abs(eig(X{i}'*X{i})))+lambda; 
 end
 Hmax_sum=sum(Hmax);
-hfun=Hmax_sum./Hmax;
-nonprob=Hmax/Hmax_sum;
+hfun=Hmax_sum./Hmax; % A./B 表示 A 中元素与 B 中元素对应相除
+nonprob=Hmax/Hmax_sum; 
 
 Hmin=zeros(num_workers,1);
 Hcond=zeros(num_workers,1);
@@ -62,22 +62,24 @@ end
 
 triggerslot=10;
 Hmaxall=0.25*max(eig(X_fede'*X_fede))+lambda;
-[cdff,cdfx] = ecdf(Hmax*num_workers/Hmaxall);
+% [f,x] = ecdf(y) returns the empirical cumulative distribution function f, evaluated at x, using the data in y.
+[cdff,cdfx] = ecdf(Hmax*num_workers/Hmaxall); % 经验e累积分布函数cdf
 comm_save=0;
-for i=1:triggerslot
-    comm_save=comm_save+(1/i-1/(i+1))*cdff(find(cdfx>=min(max(cdfx),sqrt(1/(triggerslot*i))),1));
+for i=1:triggerslot % 触发器槽
+    comm_save=comm_save+(1/i-1/(i+1))*cdff(find(cdfx>=min(max(cdfx),sqrt(1/(triggerslot*i))),1)); % k = find(X,n) 返回与 X 中的非零元素对应的前 n 个索引。列向量
 end
 
-heterconst=mean(exp(Hmax/Hmaxall));
+heterconst=mean(exp(Hmax/Hmaxall)); % mean均值；Y = exp(X) 为数组 X 中的每个元素返回指数 e^x 
 heterconst2=mean(Hmax/Hmaxall);
 rate=1/(1+sum(Hmin)/(4*sum(Hmax)));
-%% parameter initialization
+
+%% parameter initialization 参数初始化
 %triggerslot=100;
 theta=zeros(num_feature,num_iter);
 grads=ones(num_feature,num_workers);
 %stepsize=1/(num_workers*max(Hmax));
 stepsize=1/Hmaxall;
-thrd=10/(stepsize^2*num_workers^2)/triggerslot;
+thrd=10/(stepsize^2*num_workers^2)/triggerslot; % threshold?
 comm_count=ones(num_workers,1);
 
 theta2=zeros(num_feature,num_iter);
