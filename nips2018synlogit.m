@@ -123,18 +123,19 @@ for iter=1:num_iter*10
     end
     % central server computation
     if iter>1
-    grads2=-(X_fede'*(y_fede./(1+exp(y_fede.*(X_fede*theta2(:,iter))))))+num_workers*lambda*theta2(:,iter);
+    grads2=-(X_fede'*(y_fede./(1+exp(y_fede.*(X_fede*theta2(:,iter))))))+num_workers*lambda*theta2(:,iter); % 新的本地梯度
         end
-    grad_error2(iter)=norm(sum(grads2,2),2);
+    % S = sum(A,dim) 沿维度 dim 返回总和。例如，如果 A 为矩阵，则 sum(A,2) 是包含每一行总和的列向量。 计算每列总和：S=sum(A)，返回行向量，或参数=1
+    grad_error2(iter)=norm(sum(grads2,2),2); % 返回矩阵 X 的 p-范数，其中 p 为 1、2 或 Inf：如果 p = 2，则 n 近似于 max(svd(X))。这与 norm(X) 等效。可以认为是计算梯度的大小
 
-    loss2(iter)=num_workers*lambda*0.5*norm(theta2(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta2(:,iter)))));
-    theta2(:,iter+1)=theta2(:,iter)-stepsize2*grads2;
-    comm_error2=[comm_error2;iter*num_workers,loss2(iter)]; 
-    comm_grad2=[comm_grad2;iter*num_workers,grad_error2(iter)]; 
+    loss2(iter)=num_workers*lambda*0.5*norm(theta2(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta2(:,iter))))); % 误差 loss function
+    theta2(:,iter+1)=theta2(:,iter)-stepsize2*grads2; % 新的变量 利用梯度下降法更新
+    comm_error2=[comm_error2;iter*num_workers,loss2(iter)]; % 记录？误差
+    comm_grad2=[comm_grad2;iter*num_workers,grad_error2(iter)];  % 记录？梯度的范数（大小？）
 end
 
 for iter=i:num_iter
-   if abs(loss2(iter)-loss2(end))<accuracy
+   if abs(loss2(iter)-loss2(end))<accuracy % 找到到达所需的精度目标的迭代轮次 --> 统计通信轮次 = 迭代次数 * 每轮迭代进行通信的计算节点个数 （GD中所有计算节点每轮都与server通信）
     fprintf('Communication rounds of GD\n');
        iter*num_workers  
        break
@@ -149,18 +150,18 @@ comm_grad=[];
 theta_temp=zeros(num_feature,num_workers);
 
 for iter=1:num_iter*5
-    
+% 每轮迭代中
     comm_flag=0;
  %   local worker computation
-    for i=1:num_workers
+    for i=1:num_workers  % 对于每个计算节点
         if iter>triggerslot
             trigger=0;
             for n=1:triggerslot
-            trigger=trigger+norm(theta(:,iter-(n-1))-theta(:,iter-n),2)^2;
+            trigger=trigger+norm(theta(:,iter-(n-1))-theta(:,iter-n),2)^2; % 公式15(b) 范数近似；新的变量theta由server发送给worker
             end
 
-            if Hmax(i)^2*norm(theta_temp(:,i)-theta(:,iter),2)^2>thrd*trigger
-                grads(:,i)=-(X{i}'*(y{i}./(1+exp(y{i}.*(X{i}*theta(:,iter))))))+lambda*theta(:,iter);
+            if Hmax(i)^2*norm(theta_temp(:,i)-theta(:,iter),2)^2>thrd*trigger % thrd=threshold, 右边是触发通信的trigger，即梯度变化已经大到一定程度
+                grads(:,i)=-(X{i}'*(y{i}./(1+exp(y{i}.*(X{i}*theta(:,iter))))))+lambda*theta(:,iter); % 计算新的本地梯度
                 theta_temp(:,i)=theta(:,iter);
                 comm_index(i,iter)=1;
                 comm_count(i)=comm_count(i)+1;
@@ -172,8 +173,8 @@ for iter=1:num_iter*5
     
 %    central server computation
     grad_error(iter)=norm(sum(grads,2),2);
-    loss(iter)=num_workers*lambda*0.5*norm(theta(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta(:,iter)))));
-    theta(:,iter+1)=theta(:,iter)-stepsize*sum(grads,2);
+    loss(iter)=num_workers*lambda*0.5*norm(theta(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta(:,iter))))); % 误差计算
+    theta(:,iter+1)=theta(:,iter)-stepsize*sum(grads,2); % 新的变量，通过梯度下降法更新
     
 
     if comm_flag==1
@@ -185,7 +186,7 @@ for iter=1:num_iter*5
         comm_error=[comm_error;comm_iter,loss(iter)];
         comm_grad=[comm_grad;comm_iter,grad_error(iter)];
     end
-    if abs(loss(iter)-loss2(end))<accuracy
+    if abs(loss(iter)-loss2(end))<accuracy % 通过记录下来的loss找到达到目标精度所需的通信轮次
         fprintf('Communication rounds of LAG-PS\n');
         comm_iter
         break
