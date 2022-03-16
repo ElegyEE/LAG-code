@@ -164,8 +164,8 @@ for iter=1:num_iter*5
                 grads(:,i)=-(X{i}'*(y{i}./(1+exp(y{i}.*(X{i}*theta(:,iter))))))+lambda*theta(:,iter); % 计算新的本地梯度
                 theta_temp(:,i)=theta(:,iter);
                 comm_index(i,iter)=1;
-                comm_count(i)=comm_count(i)+1;
-                comm_iter=comm_iter+1;
+                comm_count(i)=comm_count(i)+1; % 每个worker的迭代次数统计
+                comm_iter=comm_iter+1; % 统计总通信迭代次数
                 comm_flag=1;
             end
         end
@@ -180,13 +180,13 @@ for iter=1:num_iter*5
     if comm_flag==1
         comm_error=[comm_error;comm_iter,loss(iter)];
         comm_grad=[comm_grad;comm_iter,grad_error(iter)];
-    elseif  mod(iter,1000)==0
+    elseif  mod(iter,1000)==0 % 强制进行通信？
         iter
         comm_iter=comm_iter+1;
         comm_error=[comm_error;comm_iter,loss(iter)];
         comm_grad=[comm_grad;comm_iter,grad_error(iter)];
     end
-    if abs(loss(iter)-loss2(end))<accuracy % 通过记录下来的loss找到达到目标精度所需的通信轮次
+    if abs(loss(iter)-loss2(end))<accuracy % 通过与GD的loss相比较，找到达到目标精度所需的通信轮次，并退出循环
         fprintf('Communication rounds of LAG-PS\n');
         comm_iter
         break
@@ -210,17 +210,17 @@ for iter=1:num_iter*5
             trigger=trigger+norm(theta5(:,iter-(n-1))-theta5(:,iter-n),2)^2;
             end
 
-            if norm(grad_temp-grads5(:,i),2)^2>thrd5*trigger
+            if norm(grad_temp-grads5(:,i),2)^2>thrd5*trigger % 触发条件 worker收到来自server的theta后检查本地梯度的变化，并决定是否要通信
                 grads5(:,i)=grad_temp;
                 comm_count5(i)=comm_count5(i)+1;
                 comm_index5(i,iter)=1;
-                comm_iter5=comm_iter5+1;
+                comm_iter5=comm_iter5+1; % 统计总通信轮次
                 comm_flag=1;
             end
         end       
     end
     grad_error5(iter)=norm(sum(grads5,2),2);
-    loss5(iter)=num_workers*lambda*0.5*norm(theta5(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta5(:,iter)))));
+    loss5(iter)=num_workers*lambda*0.5*norm(theta5(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta5(:,iter))))); % 代价函数
     if comm_flag==1
        comm_error5=[comm_error5;comm_iter5,loss5(iter)]; 
        comm_grad5=[comm_grad5;comm_iter5,grad_error5(iter)]; 
@@ -230,8 +230,8 @@ for iter=1:num_iter*5
         comm_error5=[comm_error5;comm_iter5,loss5(iter)]; 
        comm_grad5=[comm_grad5;comm_iter5,grad_error5(iter)]; 
     end
-    theta5(:,iter+1)=theta5(:,iter)-stepsize5*sum(grads5,2);
-    if abs(loss5(iter)-loss2(end))<accuracy
+    theta5(:,iter+1)=theta5(:,iter)-stepsize5*sum(grads5,2); % 由server计算新的theta值
+    if abs(loss5(iter)-loss2(end))<accuracy % 与GD相比是否到达所需精度，到达则停止迭代，退出循环
         fprintf('Communication rounds of LAG-WK\n');
         comm_iter5
         break
