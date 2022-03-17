@@ -13,16 +13,17 @@ close all
 accuracy=1e-8;
 num_iter=4000;
 num_split=6;
-num_workers=num_split*3;
+num_workers=num_split*3; % 每份数据分成split份分别处理，总共有3份数据，所以共需要这么多worker
 X=cell(num_workers);
 y=cell(num_workers);
 
+% 分别处理3份数据，依次存入 X 和 y 中；对于每份数据，按批处理样本（split）
 num_feature=min(min(size(Xdata_28,2),size(Xdata_29,2)),size(Xdata_30,2));
 num_sample=size(Xdata_28,1);
-per_split=floor(num_sample/num_split);
+per_split=floor(num_sample/num_split); % floor 向下取整
 
 for n=1:num_split
-X{n}=Xdata_28(per_split*(n-1)+1:per_split*n,1:num_feature);
+X{n}=Xdata_28(per_split*(n-1)+1:per_split*n,1:num_feature); % 取出每个split所需要的数据 按行分出split（即按样本分批）
 y{n}=ydata_28(per_split*(n-1)+1:per_split*n);
 end
 
@@ -44,7 +45,7 @@ end
 X_fede=[];
 y_fede=[];
 for i=1:num_workers
-  X_fede=[X_fede;X{i}];
+  X_fede=[X_fede;X{i}]; % 将所有的样本输入放入同一个矩阵中 本来是分别放在不同的cell中的
   y_fede=[y_fede;y{i}];
 end
 
@@ -56,7 +57,7 @@ Hmax=zeros(num_workers,1);
 % end
 
 for i=1:num_workers
-   Hmax(i)=max(eig(X{i}'*X{i})); 
+   Hmax(i)=max(eig(X{i}'*X{i})); % 协方差矩阵 X和y的相关性
 end
 Hmax_sum=sum(Hmax);
 hfun=Hmax_sum./Hmax;
