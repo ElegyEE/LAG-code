@@ -154,7 +154,7 @@ for iter=1:num_iter*2
 
     loss2(iter)=num_workers*lambda*0.5*norm(theta2(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta2(:,iter))))); % loss function
     theta2(:,iter+1)=theta2(:,iter)-stepsize2*grads2;
-    comm_error2=[comm_error2;iter*num_workers,loss2(iter)]; 
+    comm_error2=[comm_error2;iter*num_workers,loss2(iter)]; % 列1：累积通信次数 后面：loss 每行记录一个loss及其对应的累计通信次数
     comm_grad2=[comm_grad2;iter*num_workers,grad_error2(iter)]; 
 end
 
@@ -201,7 +201,7 @@ for iter=1:num_iter
     
 
     if comm_flag==1
-        comm_error=[comm_error;comm_iter,loss(iter)];
+        comm_error=[comm_error;comm_iter,loss(iter)]; % 列1：累积通信次数，其他列 loss；因为并不是每计算一次loss就腰通信一次，所以用这样的方法记录下来每个loss对应的累积通信次数，便于作图
         comm_grad=[comm_grad;comm_iter,grad_error(iter)];
     elseif  mod(iter,1000)==0
         iter
