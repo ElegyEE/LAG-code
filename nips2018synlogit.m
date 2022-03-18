@@ -22,7 +22,7 @@ total_sample=size(Xdata_29(1:50,:),1);
 Xdata=randn(total_sample,num_feature);
 ydata=[ydata_29(1:50)];
 
-[Q R]=qr(Xdata); % qr分解
+[Q R]=qr(Xdata); % qr分解 当特征维度过多时可通过矩阵的QR分解实现在尽可能保留原有信息的情况下降低维度
 diagmatrix=diag(ones(total_sample,1)); % 创建对角矩阵
 % [lambda]=eig(Xdata'*Xdata); % 特征值
 Hmax=zeros(num_workers,1);
