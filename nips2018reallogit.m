@@ -148,13 +148,13 @@ for iter=1:num_iter*2
     end
     % central server computation
     if iter>1
-    grads2=-(X_fede'*(y_fede./(1+exp(y_fede.*(X_fede*theta2(:,iter))))))+num_workers*lambda*theta2(:,iter);
+    grads2=-(X_fede'*(y_fede./(1+exp(y_fede.*(X_fede*theta2(:,iter))))))+num_workers*lambda*theta2(:,iter); % logistic regression 梯度计算公式
         end
     grad_error2(iter)=norm(sum(grads2,2),2);
 
-    loss2(iter)=num_workers*lambda*0.5*norm(theta2(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta2(:,iter)))));
+    loss2(iter)=num_workers*lambda*0.5*norm(theta2(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta2(:,iter))))); % loss function
     theta2(:,iter+1)=theta2(:,iter)-stepsize2*grads2;
-    comm_error2=[comm_error2;iter*num_workers,loss2(iter)]; 
+    comm_error2=[comm_error2;iter*num_workers,loss2(iter)]; % 列1：累积通信次数 后面：loss 每行记录一个loss及其对应的累计通信次数
     comm_grad2=[comm_grad2;iter*num_workers,grad_error2(iter)]; 
 end
 
@@ -183,12 +183,12 @@ for iter=1:num_iter
             trigger=trigger+norm(theta(:,iter-(n-1))-theta(:,iter-n),2)^2;
             end
 %             trigger=trigger/triggerslot;
-            if Hmax(i)^2*norm(theta_temp(:,i)-theta(:,iter),2)^2>thrd*trigger
-                grads(:,i)=-(X{i}'*(y{i}./(1+exp(y{i}.*(X{i}*theta(:,iter))))))+lambda*theta(:,iter);
+            if Hmax(i)^2*norm(theta_temp(:,i)-theta(:,iter),2)^2>thrd*trigger % 通信触发的条件
+                grads(:,i)=-(X{i}'*(y{i}./(1+exp(y{i}.*(X{i}*theta(:,iter))))))+lambda*theta(:,iter); % 满足条件，计算本地梯度
                 theta_temp(:,i)=theta(:,iter);
                 comm_index(i,iter)=1;
                 comm_count(i)=comm_count(i)+1;
-                comm_iter=comm_iter+1;
+                comm_iter=comm_iter+1; % 计通信轮次
                 comm_flag=1;
             end
         end
@@ -196,12 +196,12 @@ for iter=1:num_iter
     
     % central server computation
     grad_error(iter)=norm(sum(grads,2),2);
-    loss(iter)=num_workers*lambda*0.5*norm(theta(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta(:,iter)))));
-    theta(:,iter+1)=theta(:,iter)-stepsize*sum(grads,2);
+    loss(iter)=num_workers*lambda*0.5*norm(theta(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta(:,iter))))); % 计算全局误差
+    theta(:,iter+1)=theta(:,iter)-stepsize*sum(grads,2); % 计算下一步变量theta
     
 
     if comm_flag==1
-        comm_error=[comm_error;comm_iter,loss(iter)];
+        comm_error=[comm_error;comm_iter,loss(iter)]; % 列1：累积通信次数，其他列 loss；因为并不是每计算一次loss就腰通信一次，所以用这样的方法记录下来每个loss对应的累积通信次数，便于作图
         comm_grad=[comm_grad;comm_iter,grad_error(iter)];
     elseif  mod(iter,1000)==0
         iter
@@ -226,24 +226,24 @@ for iter=1:num_iter
     comm_flag=0;
     % local worker computation
     for i=1:num_workers
-        grad_temp=-(X{i}'*(y{i}./(1+exp(y{i}.*(X{i}*theta5(:,iter))))))+lambda*theta5(:,iter);
+        grad_temp=-(X{i}'*(y{i}./(1+exp(y{i}.*(X{i}*theta5(:,iter))))))+lambda*theta5(:,iter); % 计算本地梯度
         if iter>triggerslot
             trigger=0;
             for n=1:triggerslot
             trigger=trigger+norm(theta5(:,iter-(n-1))-theta5(:,iter-n),2)^2;
             end
 %             trigger=trigger/triggerslot;
-            if norm(grad_temp-grads5(:,i),2)^2>thrd5*trigger
+            if norm(grad_temp-grads5(:,i),2)^2>thrd5*trigger % 观察是否满足通信触发条件
                 grads5(:,i)=grad_temp;
                 comm_count5(i)=comm_count5(i)+1;
                 comm_index5(i,iter)=1;
-                comm_iter5=comm_iter5+1;
+                comm_iter5=comm_iter5+1; % 计通信轮次，这里的通信轮次应该仅指worker向server上传的通信次数
                 comm_flag=1;
             end
         end       
     end
     grad_error5(iter)=norm(sum(grads5,2),2);
-    loss5(iter)=num_workers*lambda*0.5*norm(theta5(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta5(:,iter)))));
+    loss5(iter)=num_workers*lambda*0.5*norm(theta5(:,iter))^2+sum(log(1+exp(-y_fede.*(X_fede*theta5(:,iter))))); % 相当于server计算loss
     if comm_flag==1
        comm_error5=[comm_error5;comm_iter5,loss5(iter)]; 
        comm_grad5=[comm_grad5;comm_iter5,grad_error5(iter)]; 
@@ -253,7 +253,7 @@ for iter=1:num_iter
         comm_error5=[comm_error5;comm_iter5,loss5(iter)]; 
        comm_grad5=[comm_grad5;comm_iter5,grad_error5(iter)]; 
     end
-    theta5(:,iter+1)=theta5(:,iter)-stepsize5*sum(grads5,2);
+    theta5(:,iter+1)=theta5(:,iter)-stepsize5*sum(grads5,2); % 相当于server计算出下一步变量theta然后传给worker
     if abs(loss5(iter)-loss2(end))<accuracy
         fprintf('Communication rounds of LAG-WK\n');
         comm_iter5
